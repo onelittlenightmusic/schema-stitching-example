@@ -1,6 +1,6 @@
 [submodule "user"]
 	path = user
-	url = ./user
+	url = https://github.com/onelittlenightmusic/prisma-binding-typescript-sample.git
 [submodule "location"]
 	path = location
-	url = ./location
+	url = https://github.com/onelittlenightmusic/prisma-binding-typescript-sample.git
