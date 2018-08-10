@@ -1,0 +1,6 @@
+[submodule "user"]
+	path = user
+	url = ./user
+[submodule "location"]
+	path = location
+	url = ./location
