@@ -20,8 +20,15 @@ async function run() {
 	const locationSchema = await createRemoteSchema('http://localhost:4021')
 	const linkSchemaDefs = `
 		extend type User {
-			locations: [Location],
+			# original
+			# locations: [Location],
+			# new api (TYPE CHANGE: from array to single object)
 			location: Location
+		}
+
+		extend type Location {
+			# SCHEMA CHANGE: field added 
+			location_type: String
 		}
 	`
 
@@ -32,35 +39,58 @@ async function run() {
 	}
 	const locationBinding = new LocationBinding()
 
+
 	const schema = mergeSchemas({
 		schemas: [userSchema, locationSchema, linkSchemaDefs],
-		resolvers: () => ({
+		resolvers: {
 			User: {
-				locations: {
-					fragment: `fragment UserFragment on User {address}`,
-					resolve: async (parent: any, args: any, context: any, info: any) => {
-						return info.mergeInfo.delegateToSchema({
-							schema: locationSchema,
-							operation: 'query',
-							fieldName: 'locations',
-							args: {where: {address: parent.address}},
-							context,
-							info
-						})
-					}
-				},
+				// original
+				// locations: {
+				// 	fragment: `fragment LocationFragment on Location {address}`,
+				// 	resolve: async (parent: any, args: any, context: any, info: any) => {
+				// 		return info.mergeInfo.delegateToSchema({
+				// 			schema: locationSchema,
+				// 			operation: 'query',
+				// 			fieldName: 'locations',
+				// 			args: {where: {address: parent.address}},
+				// 			context,
+				// 			info
+				// 		})
+				// 	}
+				// },
+				// new api
 				location: {
-					fragment: `fragment UserFragment on User {address}`,
+					fragment: `fragment LocationFragment on Location {address}`,
 					resolve: async (parent: any, args: any, context: any, info: any) => {
-						const locations = await locationBinding.query.locations({where: {address: parent.address}}, info)
-						return locations[0]
+						let locations = await locationBinding.query.locations({where: {address: parent.address}}, info)
+						return {
+							...locations[0],
+							// add new field
+							location_type: "LARGE-CITY"
+						}
 					}
 				}
 			}
-		})
+		}
 	})
 
-	const server = new GraphQLServer({ schema	})
+	// const logInput = async (resolve, root, args, context, info) => {
+	// 	console.log(`logInput: ${JSON.stringify(root)},${JSON.stringify(args)}`)
+	// 	const result = await resolve(root, args, context, info)
+	// 	console.log(`logInput: ${JSON.stringify(result)}`)
+	// 	return result
+	// }
+
+	const server = new GraphQLServer({ 
+		schema, 
+		// middlewares: [
+		// 	{
+		// 		Query: {
+		// 			users: logInput,
+		// 		}
+		// 	}
+		// ]
+	})
 	server.start({port: __API_PORT__}, () =>
 		console.log(`Your GraphQL server is running now ...`),
 	)
