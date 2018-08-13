@@ -1,7 +1,7 @@
 # schema-stitching-example
 Example of Schema Stitching with GraphQL
 
-# Example
+# Simple example
 
 Type `User` is [here](https://github.com/onelittlenightmusic/prisma-binding-typescript-sample/blob/96ebb87e5d281c7ccef3a55c6dd1963e9c220cf6/prisma/datamodel.graphql)
 
@@ -22,9 +22,28 @@ type Location {
 }
 ```
 
-View [index.ts](./index.ts).
+View [indexSimple.ts](./indexSimple.ts).
 
 In `mergeSchemas`, 
+
+```ts
+resolve: async (parent: any, args: any, context: any, info: any) => {
+    return info.mergeInfo.delegateToSchema({
+        schema: locationSchema,
+        operation: 'query',
+        fieldName: 'locations',
+        args: {where: {address: parent.address}},
+        context,
+        info
+    })
+}
+```
+
+## Advanced example
+
+You can customize API schema with `graphql-binding`.
+
+View [index.ts](./index.ts).
 
 ```ts
 location: {
