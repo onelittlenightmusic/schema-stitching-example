@@ -27,16 +27,26 @@ View [indexSimple.ts](./indexSimple.ts).
 In `mergeSchemas`, 
 
 ```ts
-resolve: async (parent: any, args: any, context: any, info: any) => {
-    return info.mergeInfo.delegateToSchema({
-        schema: locationSchema,
-        operation: 'query',
-        fieldName: 'locations',
-        args: {where: {address: parent.address}},
-        context,
-        info
+const schema = mergeSchemas({
+    schemas: [userSchema, locationSchema, linkSchemaDefs],
+    resolvers: () => ({
+        User: {
+            locations: {
+                fragment: `fragment UserFragment on User {address}`,
+                resolve: async (parent: any, args: any, context: any, info: any) => {
+                    return info.mergeInfo.delegateToSchema({
+                        schema: locationSchema,
+                        operation: 'query',
+                        fieldName: 'locations',
+                        args: {where: {address: parent.address}},
+                        context,
+                        info
+                    })
+                }
+            },
+        }
     })
-}
+})
 ```
 
 ## Advanced example
