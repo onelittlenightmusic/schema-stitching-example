@@ -57,7 +57,7 @@ View [index.ts](./index.ts).
 
 ```ts
 location: {
-    fragment: `fragment LocationFragment on Location {address}`,
+    fragment: `fragment UserFragment on User {address}`,
     resolve: async (parent: any, args: any, context: any, info: any) => {
         let locations = await locationBinding.query.locations({where: {address: parent.address}}, info)
         return {

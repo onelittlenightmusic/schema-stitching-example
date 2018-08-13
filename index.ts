@@ -21,7 +21,7 @@ async function run() {
 	const linkSchemaDefs = `
 		extend type User {
 			# original
-			# locations: [Location],
+			locations: [Location],
 			# new api (TYPE CHANGE: from array to single object)
 			location: Location
 		}
@@ -45,22 +45,23 @@ async function run() {
 		resolvers: {
 			User: {
 				// original
-				// locations: {
-				// 	fragment: `fragment LocationFragment on Location {address}`,
-				// 	resolve: async (parent: any, args: any, context: any, info: any) => {
-				// 		return info.mergeInfo.delegateToSchema({
-				// 			schema: locationSchema,
-				// 			operation: 'query',
-				// 			fieldName: 'locations',
-				// 			args: {where: {address: parent.address}},
-				// 			context,
-				// 			info
-				// 		})
-				// 	}
-				// },
+				locations: {
+					fragment: `fragment UserFragment on User {address}`,
+					resolve: async (parent: any, args: any, context: any, info: any) => {
+						console.log(` ${JSON.stringify(parent)}`)
+						return info.mergeInfo.delegateToSchema({
+							schema: locationSchema,
+							operation: 'query',
+							fieldName: 'locations',
+							args: {where: {address: parent.address}},
+							context,
+							info
+						})
+					}
+				},
 				// new api
 				location: {
-					fragment: `fragment LocationFragment on Location {address}`,
+					fragment: `fragment UserFragment on User {address}`,
 					resolve: async (parent: any, args: any, context: any, info: any) => {
 						let locations = await locationBinding.query.locations({where: {address: parent.address}}, info)
 						return {
