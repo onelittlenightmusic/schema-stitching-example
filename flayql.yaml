@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Star
+schema:
+- name: User
+  metadata:
+    root: true
+  definition:
+    type: GraphQL
+    url: 'http://localhost:4020'
+    query: 'users'
+  join:
+  - schema: 'Location'
+    label: 'locations'
+    where:
+      address: address
+- name: Location
+  definition:
+    type: GraphQL
+    url: 'http://localhost:4021'
+    query: 'locations'
+  
