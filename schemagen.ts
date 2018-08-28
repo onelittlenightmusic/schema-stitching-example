@@ -3,21 +3,18 @@ import * as DataLoader from 'dataloader'
 import { GraphQLSchema } from 'graphql';
 import { createRemoteSchema } from './createRemoteSchema'
 import { mergeSchemas } from 'graphql-tools'
-import { loadConfig } from './star'
+import { loadConfig, createConnection, createResolver } from './star'
+// import { loadConfig, createConnection } from './star'
 
 export async function star(): Promise<GraphQLSchema> {
     var starSchema = loadConfig()
-    // console.log( yamlconfig.schema[1]['definition']['url'] )
 
-    // var linkSchemas: GraphQLSchema[] = []
-    // for(var schema of starSchema) {
-    //     linkSchemas.push(await createRemoteSchema(schema.definition.url))
-    // }
     var linkSchemas: GraphQLSchema[] = await Promise.all(
         starSchema.map(async schema => {
             return await createRemoteSchema(schema.definition.url) 
         })
     )
+    var root = starSchema[0]
     const locationSchema: GraphQLSchema = linkSchemas[1]
     
     var linkSchemaDef: (GraphQLSchema | string)[] = linkSchemas
@@ -27,7 +24,8 @@ export async function star(): Promise<GraphQLSchema> {
 			locations: [Location],
 			# new api (TYPE CHANGE: from array to single object)
 			location: Location,
-			location2: Location
+			location2: Location,
+            ${createConnection(root)}
 		}
 	`)
 	const createBinding = (newSchema: GraphQLSchema) => {
@@ -52,7 +50,7 @@ export async function star(): Promise<GraphQLSchema> {
 
 	const batchLoader = new DataLoader<string, any[]>(batchLocations);
 
-	return mergeSchemas({
+	var mergeSchemaArg = {
 		schemas: linkSchemas,
 		resolvers: {
 			User: {
@@ -84,7 +82,9 @@ export async function star(): Promise<GraphQLSchema> {
 				}
 			}
 		}
-	})
+    }
+    mergeSchemaArg.resolvers.User = createResolver(root, locationSchema, mergeSchemaArg.resolvers.User)
+    return mergeSchemas(mergeSchemaArg)
 
 
 }
