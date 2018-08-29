@@ -9,9 +9,8 @@ schema:
     url: 'http://localhost:4020'
     query: 'users'
   join:
-  - query: 'locations'
-    label: 'locations2'
-    type: '[Location]'
+  - label: 'location2'
+    type: 'Location'
     where:
       address: address
 - name: Location

@@ -1,89 +1,62 @@
-import { Binding } from 'graphql-binding'
-import * as DataLoader from 'dataloader'
 import { GraphQLSchema } from 'graphql';
-import { createRemoteSchema } from './createRemoteSchema'
 import { mergeSchemas } from 'graphql-tools'
-import { loadConfig, createConnection, createResolver } from './star'
+import { loadConfig, createConnection, createResolver, getAllSchema } from './star'
+import { batchLoader } from './batchLoad'
 // import { loadConfig, createConnection } from './star'
 
-export async function star(): Promise<GraphQLSchema> {
-    var starSchema = loadConfig()
+export async function generateStarSchema(starYamlFile: string, targetChildName: string): Promise<GraphQLSchema | null> {
+    var starSchemaTables = loadConfig(starYamlFile)
+    await getAllSchema(starSchemaTables)
 
-    var linkSchemas: GraphQLSchema[] = await Promise.all(
-        starSchema.map(async schema => {
-            return await createRemoteSchema(schema.definition.url) 
-        })
-    )
-    var root = starSchema[0]
-    const locationSchema: GraphQLSchema = linkSchemas[1]
+    var rootTable = starSchemaTables.find(schema => { return schema.metadata.root })
+    if(rootTable == null) {
+        return null
+    }
+
+    const childTable = starSchemaTables.find(schema => { return schema.name == targetChildName })
+    if(childTable == null) {
+        return null
+    }
+    const childSchema: GraphQLSchema = childTable.GraphQLSchema
     
-    var linkSchemaDef: (GraphQLSchema | string)[] = linkSchemas
+    var linkSchemaDef: (GraphQLSchema | string)[] = starSchemaTables.map(schema => schema.GraphQLSchema)
 	linkSchemaDef.push(`
 		extend type User {
 			# original
-			locations: [Location],
+			# locations: [Location],
 			# new api (TYPE CHANGE: from array to single object)
 			location: Location,
-			location2: Location,
-            ${createConnection(root)}
+			# location2: Location,
+            ${createConnection(rootTable)}
 		}
 	`)
-	const createBinding = (newSchema: GraphQLSchema) => {
-		return new Binding ({ schema: newSchema })
-	}
-	const locationBinding = createBinding(locationSchema)
 
-	type BatchLocation = (addresses: string[]) => Promise<any[]>
-
-	const batchLocations: BatchLocation = async addresses => {
-		const locations = await locationBinding.query.locations({ where: {address_in: addresses}})
-		const locationMap: { [key: string]: any[] } = {}
-		// return locations.
-		locations.forEach(element => {
-            if(locationMap[element.address] == null) {
-                locationMap[element.address] = []
-            }
-			locationMap[element.address].push(element)
-		})
-		return addresses.map(address => locationMap[address])
-	}
-
-	const batchLoader = new DataLoader<string, any[]>(batchLocations);
+    const batchResolver = (locationBinding, keys) => {
+        var query = locationBinding.query[childTable.definition.query]
+        return query({ where: {address_in: keys}})
+    }
+    const batchLocationLoader = batchLoader(childSchema, batchResolver)
+    const mergeResolver = (where: any) =>  {
+        return async (parent: any, args: any, context: any, info: any) => {
+            return (await batchLocationLoader.load(<string>parent.address))[0]
+        }
+    }
 
 	var mergeSchemaArg = {
-		schemas: linkSchemas,
+		schemas: linkSchemaDef,
 		resolvers: {
 			User: {
-				locations: {
-					fragment: `fragment UserFragment on User {address}`,
-					resolve: async (parent: any, args: any, context: any, info: any) => {
-						return info.mergeInfo.delegateToSchema({
-							schema: locationSchema,
-							operation: 'query',
-							fieldName: 'locations',
-							args: {where: {address: parent.address}},
-							context,
-							info
-						})
-					}
-				},
 				location: {
 					fragment: `fragment UserFragment on User {address}`,
 					resolve: async (parent: any, args: any, context: any, info: any) => {
-						let locations = await locationBinding.query.locations({where: {address: parent.address}}, info)
-						return locations[0]
-					}
-				},
-				location2: {
-					fragment: `fragment UserFragment on User {address}`,
-					resolve: async (parent: any, args: any, context: any, info: any) => {
-						return (await batchLoader.load(<string>parent.address))[0]
+						return (await batchLocationLoader.load(<string>parent.address))[0]
 					}
 				}
 			}
 		}
     }
-    mergeSchemaArg.resolvers.User = createResolver(root, locationSchema, mergeSchemaArg.resolvers.User)
+
+    Object.assign(mergeSchemaArg.resolvers.User, createResolver(rootTable, mergeResolver))
     return mergeSchemas(mergeSchemaArg)
 
 

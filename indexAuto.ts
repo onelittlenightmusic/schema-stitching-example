@@ -1,11 +1,11 @@
 import { GraphQLServer } from 'graphql-yoga'
-import { star } from './schemagen'
+import { generateStarSchema } from './schemagen'
 import { config } from 'dotenv'
 config()
 const __API_PORT__ = process.env.API_PORT
 
 async function run() {
-	const schema = await star()
+	const schema = await generateStarSchema('./flayql.yaml', 'Location')
 	// const logInput = async (resolve, root, args, context, info) => {
 	// 	// console.log(`>>>logInput: ${JSON.stringify(root)},${JSON.stringify(args)}`)
 	// 	const result = await resolve(root, args, context, info)
@@ -13,6 +13,9 @@ async function run() {
 	// 	return result
 	// }
 
+	if(schema == null) {
+		return
+	}
 	const server = new GraphQLServer({ 
 		schema, 
 		// middlewares: [logInput
