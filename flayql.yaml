@@ -8,11 +8,12 @@ schema:
     type: GraphQL
     url: 'http://localhost:4020'
     query: 'users'
-  join:
-  - label: 'location2'
-    type: 'Location'
-    where:
+  links:
+  - to: 'Location'
+    as: 'location2'
+    sameAt:
       address: address
+    onlyOne: true
 - name: Location
   definition:
     type: GraphQL

@@ -3,7 +3,6 @@ import { makeRemoteExecutableSchema, introspectSchema } from 'graphql-tools'
 import { BatchHttpLink } from 'apollo-link-batch-http'
 // import { HTTPLinkDataloader } from 'http-link-dataloader' // not applicable
 import { DedupLink } from 'apollo-link-dedup'
-// import { create } from 'domain';
 import fetch from 'node-fetch'
 
 export const createRemoteSchema = async (uri: string) => {

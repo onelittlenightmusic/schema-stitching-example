@@ -1,44 +1,37 @@
 import { GraphQLSchema } from 'graphql';
 import { mergeSchemas } from 'graphql-tools'
-import { loadConfig, createConnection, createResolver, getAllSchema } from './star'
-import { batchLoader } from './batchLoad'
+import { loadConfig, createResolver } from './star'
+import { createBatchLoader } from './batchLoad'
 // import { loadConfig, createConnection } from './star'
 
 export async function generateStarSchema(starYamlFile: string, targetChildName: string): Promise<GraphQLSchema | null> {
-    var starSchemaTables = loadConfig(starYamlFile)
-    await getAllSchema(starSchemaTables)
+    var starSchemaMap = loadConfig(starYamlFile)
+    await starSchemaMap.getAllSchema()
 
-    var rootTable = starSchemaTables.find(schema => { return schema.metadata.root })
+    var rootTable = starSchemaMap.getRootTable()
     if(rootTable == null) {
         return null
     }
 
-    const childTable = starSchemaTables.find(schema => { return schema.name == targetChildName })
+    const childTable = starSchemaMap.find(targetChildName)
     if(childTable == null) {
         return null
     }
-    const childSchema: GraphQLSchema = childTable.GraphQLSchema
-    
-    var linkSchemaDef: (GraphQLSchema | string)[] = starSchemaTables.map(schema => schema.GraphQLSchema)
-	linkSchemaDef.push(`
-		extend type User {
-			# original
-			# locations: [Location],
-			# new api (TYPE CHANGE: from array to single object)
-			location: Location,
-			# location2: Location,
-            ${createConnection(rootTable)}
-		}
-	`)
 
-    const batchResolver = (locationBinding, keys) => {
-        var query = locationBinding.query[childTable.definition.query]
-        return query({ where: {address_in: keys}})
+    var linkSchemaDef = starSchemaMap.schemas()
+
+    const childSchema: GraphQLSchema = childTable.GraphQLSchema
+    const batchLocationResolver = (locationBinding, keys) => {
+        var queryName = childTable.definition.query
+        var queryParameter = { where: {address_in: keys}}
+        var query = locationBinding.query[queryName]
+        return query(queryParameter)
     }
-    const batchLocationLoader = batchLoader(childSchema, batchResolver)
+    const batchLocationLoader = createBatchLoader(childSchema, batchLocationResolver)
     const mergeResolver = (where: any) =>  {
         return async (parent: any, args: any, context: any, info: any) => {
             return (await batchLocationLoader.load(<string>parent.address))[0]
+            // return (await batchLocationLoader.load(<string>parent.address))
         }
     }
 
