@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import YAML from 'yaml'
 import { GraphQLSchema } from 'graphql'
 import { createRemoteSchema } from './createRemoteSchema'
+import { mergeSchemas } from 'graphql-tools'
 
 interface StarSchemaMetadata {
     root: boolean
@@ -19,6 +20,8 @@ export interface StarSchemaTable {
     definition: StarSchemaDefinition
     links: any[]
     GraphQLSchema: GraphQLSchema
+    createLinkSchema(): string
+    createResolvers(any): any
 }
 
 export interface StarSchemaMap {
@@ -27,10 +30,56 @@ export interface StarSchemaMap {
     getRootTable(): StarSchemaTable | undefined
     find(targetName: string): StarSchemaTable | undefined
     schemas(): (GraphQLSchema | string)[]
+    createTotalExecutableSchema(any): any
+}
+
+class StarSchemaTableImpl implements StarSchemaTable {
+    name: string
+    metadata: StarSchemaMetadata
+    definition: StarSchemaDefinition
+    links: any[]
+    GraphQLSchema: GraphQLSchema
+    constructor(table: StarSchemaTable) {
+        Object.assign(this, table)
+    }
+    createLinkSchema() {
+        return `
+        extend type ${this.name} {
+            ${createLinks(this)}
+        }
+    `
+    }
+    createResolvers(mergeResolvers: any) {
+        var rtn = {}
+        var name = this.name
+        for(var jo of this.links) {
+            var fragment = `fragment ${name}Fragment on ${name} {${Object.keys(jo.sameAt).join(',')}}`
+            var resolversOfJoin = mergeResolvers[jo.as]
+            var resolve = async (parent: any, args: any, context: any, info: any) => {
+                return await (resolversOfJoin(jo.sameAt)(parent, args, context, info))
+                
+            }
+            var resolver = {
+                fragment,
+                resolve
+            }
+            rtn[jo.as] = resolver
+        }
+        return { [this.name]: rtn }
+    }
 }
 
 class StarSchemaMapImpl implements StarSchemaMap {
     tables: StarSchemaTable[]
+    root: StarSchemaTable
+    constructor(tables: StarSchemaTable[]) {
+        this.tables = tables.map(table => new StarSchemaTableImpl(table))
+        var root = this.getRootTable()
+        if(root == null) {
+            throw new Error("no input")
+        }
+        this.root = root
+    }
     async getAllSchema() {
         await getAllSchemaPrivate(this.tables)
     }
@@ -42,32 +91,29 @@ class StarSchemaMapImpl implements StarSchemaMap {
     }
     schemas() {
         var rtn: (GraphQLSchema | string)[] = this.tables.map(schema => schema.GraphQLSchema)
-        var root = this.getRootTable()
-        if(root == null) {
-            return rtn
-        }
         // todo: not only root 
-        rtn.push(`
-            extend type ${root.name} {
-                # original
-                # locations: [Location],
-                # new api (TYPE CHANGE: from array to single object)
-                location: Location,
-                # location2: Location,
-                ${createLinks(root)}
-            }
-        `)
+        rtn.push(this.root.createLinkSchema())
         return rtn
     }
-    constructor(tables: StarSchemaTable[]) {
-        this.tables = tables
+    createMergeArgs(mergeResolvers) {
+        var resolvers = this.root.createResolvers(mergeResolvers)
+        var schemas = this.schemas()
+        var mergeSchemaArg = {
+            schemas,
+            resolvers
+        }
+        return mergeSchemaArg
+    }
+    createTotalExecutableSchema(mergeResolvers) {
+        var mergeSchemaArg = this.createMergeArgs(mergeResolvers)
+        return mergeSchemas(mergeSchemaArg)
     }
 }
 
 export const loadConfig = (filename: string) => {
     var yamlData = fs.readFileSync(filename,'utf8');
     var obj = YAML.parse(yamlData);
-    var starSchema: StarSchemaMap = new StarSchemaMapImpl(<StarSchemaTable[]> obj.schema)
+    var starSchema: StarSchemaMap = new StarSchemaMapImpl(<StarSchemaTable[]> obj.tables)
     return starSchema
 }
 
@@ -88,8 +134,6 @@ const toType = (type: string, onlyOne: string | boolean) => {
     return `[${type}]`
 }
 
-
-
 export const createLinks = (starSchema: StarSchemaTable ) => {
     // todo: use schema
     var rtn = starSchema.links.map(jo => { return `${jo.as}: ${toType(jo.to, jo.onlyOne)}` }).join('\n')
@@ -97,24 +141,5 @@ export const createLinks = (starSchema: StarSchemaTable ) => {
     return rtn
 }
 
-export const createResolver = (starSchema: StarSchemaTable, mergeResolver: any) => {
-    var rtn = {}
-    var name = starSchema.name
-    for(var jo of starSchema.links) {
-        var fragment = `fragment ${name}Fragment on ${name} {${Object.keys(jo.sameAt).join(',')}}`
-        // var fieldName = query
-        var resolve = async (parent: any, args: any, context: any, info: any) => {
-            return await (mergeResolver(jo.sameAt)(parent, args, context, info))
-            
-        }
-        var resolver = {
-            fragment,
-            resolve
-        }
-        rtn[jo.as] = resolver
-    }
-    console.log(rtn)
 
-    return rtn
-}
 

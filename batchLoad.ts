@@ -8,11 +8,11 @@ const createBinding = (newSchema: GraphQLSchema) => {
 
 type BatchQuery = (keys: string[]) => Promise<any[]>
 
-export const createBatchLoader = (schema: GraphQLSchema, handler: (binding: any, keys: any)=>any) => {
+export const createBatchLoader = (schema: GraphQLSchema, query: string, handler: (binding: any, query:string, keys: any)=>any) => {
     const binding = createBinding(schema)
 
     const batchQuery: BatchQuery = async keys => {
-        const answers = await handler(binding, keys)
+        const answers = await handler(binding, query, keys)
         const answerMap: { [key: string]: any[] } = {}
         // create map for sorting answers by keys.
         answers.forEach(element => {
