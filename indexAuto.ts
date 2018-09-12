@@ -5,7 +5,7 @@ config()
 const __API_PORT__ = process.env.API_PORT
 
 async function run() {
-	const schema = await generateStarSchema('./flayql.yaml', 'Location')
+	const schema = await generateStarSchema('./flayql.yaml')
 	// const logInput = async (resolve, root, args, context, info) => {
 	// 	// console.log(`>>>logInput: ${JSON.stringify(root)},${JSON.stringify(args)}`)
 	// 	const result = await resolve(root, args, context, info)

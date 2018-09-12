@@ -14,20 +14,27 @@ interface StarSchemaDefinition {
     query: string
 }
 
+export interface StarSchemaLink {
+    to: string
+    as: string
+    sameAt: any[]
+    onlyOne: boolean
+}
+
 export interface StarSchemaTable {
     name: string
     metadata: StarSchemaMetadata
     definition: StarSchemaDefinition
-    links: any[]
+    links: StarSchemaLink[]
     GraphQLSchema: GraphQLSchema
     createLinkSchema(): string
-    createResolvers(any): any
+    createResolvers(any, StarSchemaMap): any
 }
 
 export interface StarSchemaMap {
     tables: StarSchemaTable[]
     getAllSchema(): void
-    getRootTable(): StarSchemaTable | undefined
+    getRootTable(): StarSchemaTable
     find(targetName: string): StarSchemaTable | undefined
     schemas(): (GraphQLSchema | string)[]
     createTotalExecutableSchema(any): any
@@ -49,14 +56,15 @@ class StarSchemaTableImpl implements StarSchemaTable {
         }
     `
     }
-    createResolvers(mergeResolvers: any) {
+    createResolvers(mergeResolvers: any, allMap: StarSchemaMap) {
         var rtn = {}
         var name = this.name
         for(var jo of this.links) {
             var fragment = `fragment ${name}Fragment on ${name} {${Object.keys(jo.sameAt).join(',')}}`
-            var resolversOfJoin = mergeResolvers[jo.as]
+            var toTable = allMap.find(jo.to)
+            var resolverOfJoin = mergeResolvers[jo.as](toTable)
             var resolve = async (parent: any, args: any, context: any, info: any) => {
-                return await (resolversOfJoin(jo.sameAt)(parent, args, context, info))
+                return await (resolverOfJoin(parent, args, context, info))
                 
             }
             var resolver = {
@@ -74,7 +82,7 @@ class StarSchemaMapImpl implements StarSchemaMap {
     root: StarSchemaTable
     constructor(tables: StarSchemaTable[]) {
         this.tables = tables.map(table => new StarSchemaTableImpl(table))
-        var root = this.getRootTable()
+        var root = this.tables.find(schema => { return schema.metadata.root })
         if(root == null) {
             throw new Error("no input")
         }
@@ -84,7 +92,7 @@ class StarSchemaMapImpl implements StarSchemaMap {
         await getAllSchemaPrivate(this.tables)
     }
     getRootTable() {
-        return this.tables.find(schema => { return schema.metadata.root })
+        return this.root
     }
     find(targetName: string) {
         return this.tables.find(schema => { return schema.name == targetName })
@@ -96,7 +104,7 @@ class StarSchemaMapImpl implements StarSchemaMap {
         return rtn
     }
     createMergeArgs(mergeResolvers) {
-        var resolvers = this.root.createResolvers(mergeResolvers)
+        var resolvers = this.root.createResolvers(mergeResolvers, this)
         var schemas = this.schemas()
         var mergeSchemaArg = {
             schemas,
@@ -127,8 +135,8 @@ const getAllSchemaPrivate = async (starSchemas: StarSchemaTable[]) => {
     )
 }
 
-const toType = (type: string, onlyOne: string | boolean) => {
-    if(onlyOne == 'true' || onlyOne == true) {
+const toType = (type: string, onlyOne: boolean) => {
+    if(onlyOne) {
         return type
     }
     return `[${type}]`

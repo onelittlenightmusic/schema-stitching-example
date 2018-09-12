@@ -5,7 +5,7 @@ tables:
   metadata:
     root: true
   definition:
-    type: GraphQL
+    type: graphql
     url: 'http://localhost:4020'
     query: 'users'
   links:
@@ -16,7 +16,7 @@ tables:
     onlyOne: true
 - name: Location
   definition:
-    type: GraphQL
+    type: graphql-opencrud
     url: 'http://localhost:4021'
     query: 'locations'
   

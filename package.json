@@ -1,7 +1,7 @@
 {
   "scripts": {
     "start": "nodemon --ext ts --exec 'ts-node' index.ts",
-    "autostart": "nodemon --ext ts --exec 'ts-node' indexAuto.ts",
+    "autostart": "nodemon --ext ts,yaml --exec 'ts-node' indexAuto.ts",
     "tsstart": "ts-node index.ts"
   },
   "dependencies": {
