@@ -10,7 +10,7 @@ tables:
     query: 'users'
   links:
   - to: 'Location'
-    as: 'location2'
+    # as: 'location2'
     sameAt:
       address: address
     onlyOne: true

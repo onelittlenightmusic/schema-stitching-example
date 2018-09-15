@@ -62,7 +62,8 @@ class StarSchemaTableImpl implements StarSchemaTable {
         for(var jo of this.links) {
             var fragment = `fragment ${name}Fragment on ${name} {${Object.keys(jo.sameAt).join(',')}}`
             var toTable = allMap.find(jo.to)
-            var resolverOfJoin = mergeResolvers[jo.as](toTable)
+            var label = getLinkLabel(jo)
+            var resolverOfJoin = mergeResolvers[label](toTable)
             var resolve = async (parent: any, args: any, context: any, info: any) => {
                 return await (resolverOfJoin(parent, args, context, info))
                 
@@ -71,7 +72,7 @@ class StarSchemaTableImpl implements StarSchemaTable {
                 fragment,
                 resolve
             }
-            rtn[jo.as] = resolver
+            rtn[label] = resolver
         }
         return { [this.name]: rtn }
     }
@@ -144,10 +145,14 @@ const toType = (type: string, onlyOne: boolean) => {
 
 export const createLinks = (starSchema: StarSchemaTable ) => {
     // todo: use schema
-    var rtn = starSchema.links.map(jo => { return `${jo.as}: ${toType(jo.to, jo.onlyOne)}` }).join('\n')
+    var rtn = starSchema.links.map(link => { return `${getLinkLabel(link)}: ${toType(link.to, link.onlyOne)}` }).join('\n')
     console.log(rtn)
     return rtn
 }
 
-
-
+export const getLinkLabel = (link: StarSchemaLink) => {
+    if(link.as == undefined) {
+        return link.to
+    }
+    return link.as
+}

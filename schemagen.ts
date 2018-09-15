@@ -1,5 +1,5 @@
 import { GraphQLSchema } from 'graphql';
-import { loadConfig, StarSchemaTable, StarSchemaLink } from './star'
+import { loadConfig, StarSchemaTable, StarSchemaLink, getLinkLabel } from './star'
 import { createBatchLoader } from './batchLoad'
 // import { loadConfig, createConnection } from './star'
 
@@ -11,11 +11,7 @@ export async function generateStarSchema(starYamlFile: string): Promise<GraphQLS
     var starSchemaMap = loadConfig(starYamlFile)
     await starSchemaMap.getAllSchema()
 
-    var resolvers = {}
-    // for(var hintName in hints) {
-        // var hint = hints[hintName]
-        
-    const createMergeResolver = (link: StarSchemaLink) => {
+   const createMergeResolver = (link: StarSchemaLink) => {
         return (toTable: StarSchemaTable) => {
             var hint
             if(toTable.definition.type == 'graphql-opencrud') {
@@ -38,10 +34,9 @@ export async function generateStarSchema(starYamlFile: string): Promise<GraphQLS
             }
         }
     }
-        // resolvers[hintName] = createMergeResolver
-    // }
+    var resolvers = {}
     starSchemaMap.getRootTable().links.forEach(link => {
-        resolvers[link.as] = createMergeResolver(link)
+        resolvers[getLinkLabel(link)] = createMergeResolver(link)
     })
 
     return starSchemaMap.createTotalExecutableSchema(resolvers)
